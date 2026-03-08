@@ -19,6 +19,7 @@ const path = require('path');
 const crypto = require('crypto');
 const yargs = require('yargs');
 const chalk = require('chalk');
+const { OpenAI } = require('openai');
 
 // Configuration
 const HELP_CENTER_BASE = 'https://support.joinforma.com/hc/en-us';
@@ -28,6 +29,15 @@ const COLLECTION_NAME = 'forma_help_center';
 const DELAY_MS = 500; // ms between requests
 const MAX_CHUNK_SIZE = 1500; // Approximate token limit per chunk
 const CACHE_DIR = path.join(__dirname, '..', '.cache');
+
+// Embedding configuration
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = 'nomic-embed-text';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_MODEL = 'text-embedding-3-small';
+
+// Initialize OpenAI client if API key provided
+const openaiClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 // Ensure cache directory exists
 if (!fs.existsSync(CACHE_DIR)) {
@@ -205,39 +215,77 @@ function chunkArticle(article) {
 
 /**
  * Generate embeddings for text
+ * 
+ * Tries in order:
+ * 1. Ollama (local, free)
+ * 2. OpenAI API (if OPENAI_API_KEY set)
+ * 3. Hash-based fallback (poor quality, emergency only)
  */
 async function generateEmbedding(text) {
-  // Check if we have Ollama running
+  const textSlice = text.slice(0, 8000); // Limit to 8000 chars (fits in all models)
+  
+  // Try 1: Ollama (local)
   try {
-    const response = await axios.post('http://localhost:11434/api/embeddings', {
-      model: 'nomic-embed-text',
-      prompt: text.slice(0, 5000) // Limit to 5000 chars
+    const response = await axios.post(`${OLLAMA_URL}/api/embeddings`, {
+      model: OLLAMA_MODEL,
+      prompt: textSlice
     }, { timeout: 30000 });
     
-    return response.data.embedding;
+    if (response.data.embedding) {
+      return response.data.embedding; // 384 dims, ready to use
+    }
   } catch (error) {
-    console.log(chalk.yellow('⚠️  Ollama not available, using fallback embedding...'));
-    return generateFallbackEmbedding(text);
+    // Ollama failed, try OpenAI
   }
+  
+  // Try 2: OpenAI API (if configured)
+  if (openaiClient) {
+    try {
+      const response = await openaiClient.embeddings.create({
+        model: OPENAI_MODEL,
+        input: textSlice
+      });
+      
+      if (response.data && response.data[0]) {
+        let embedding = response.data[0].embedding; // 1,536 dims
+        
+        // Project from 1,536 → 384 dims to match Qdrant config
+        // Simple method: keep first 384 dimensions
+        // (More sophisticated: could do PCA, but this works for fallback)
+        embedding = embedding.slice(0, 384);
+        
+        return embedding;
+      }
+    } catch (error) {
+      console.log(chalk.yellow(`  ⚠️  OpenAI embedding failed: ${error.message}`));
+      // Fall through to hash-based
+    }
+  }
+  
+  // Try 3: Hash-based fallback (poor quality)
+  console.log(chalk.yellow('  ⚠️  Using fallback hash-based embedding (poor quality)'));
+  return generateFallbackEmbedding(text);
 }
 
 /**
  * Simple fallback embedding (not ideal, but better than nothing)
- * In production, use proper API (Anthropic, OpenAI, etc)
+ * Only used if Ollama AND OpenAI are unavailable
  */
 function generateFallbackEmbedding(text) {
   // Generate a pseudo-embedding based on text features
-  // This is NOT a real embedding - replace with real API in production!
-  const words = text.toLowerCase().split(/\W+/);
+  // This is NOT a real embedding - emergency use only!
+  const words = text.toLowerCase().split(/\W+/).filter(w => w.length > 0);
   const embedding = new Array(384).fill(0);
+  
+  if (words.length === 0) {
+    return embedding;
+  }
   
   // Assign word hashes to embedding dimensions
   words.forEach((word, idx) => {
-    if (word.length > 0) {
-      const hash = crypto.createHash('md5').update(word).digest('hex');
-      const value = parseInt(hash.slice(0, 8), 16) / 0xffffffff;
-      embedding[idx % 384] += value / Math.sqrt(words.length);
-    }
+    const hash = crypto.createHash('md5').update(word).digest('hex');
+    const value = parseInt(hash.slice(0, 8), 16) / 0xffffffff;
+    embedding[idx % 384] += value / Math.sqrt(words.length);
   });
   
   // Normalize
@@ -343,6 +391,16 @@ async function crawlAndIndex(options = {}) {
 ║   Forma Help Center → Qdrant Vector DB Crawler       ║
 ╚════════════════════════════════════════════════════════╝
   `));
+  
+  // Show embedding configuration
+  console.log(chalk.cyan('⚙️  Embedding Configuration:'));
+  console.log(chalk.cyan(`   Primary:  Ollama (${OLLAMA_MODEL}) @ ${OLLAMA_URL}`));
+  if (openaiClient) {
+    console.log(chalk.cyan(`   Fallback: OpenAI (${OPENAI_MODEL})`));
+  } else {
+    console.log(chalk.yellow(`   Fallback: Hash-based (poor quality)`));
+    console.log(chalk.yellow(`   Tip: Set OPENAI_API_KEY for better fallback\n`));
+  }
   
   const startTime = Date.now();
   
