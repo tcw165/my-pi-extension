@@ -1,0 +1,28 @@
+{
+  "name": "my-pi-extension",
+  "version": "1.0.0",
+  "description": "A custom pi coding agent extension with Graphite (gt) CLI skill integration and tools for managing stacked PRs and Git workflows.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tcw165/my-pi-extension.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tcw165/my-pi-extension/issues"
+  },
+  "homepage": "https://github.com/tcw165/my-pi-extension#readme",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "chalk": "^4.1.2",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.3.1",
+    "yargs": "^18.0.0"
+  }
+}
