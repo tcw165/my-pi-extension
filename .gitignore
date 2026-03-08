@@ -46,3 +46,9 @@ temp/
 # Pi-specific
 .pi/cache/
 .pi/logs/
+
+# Docker & Vector DB
+.env.docker
+qdrant_data/
+ollama_data/
+*.log
