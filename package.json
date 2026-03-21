@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/tcw165/my-pi-extension#readme",
   "dependencies": {
+    "@qdrant/qdrant-js": "^1.17.0",
     "axios": "^1.13.6",
     "chalk": "^4.1.2",
     "cheerio": "^1.2.0",
