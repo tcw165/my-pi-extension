@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/boyw165/Projects/my-pi-extension/.claude/skills && ln -s /Users/boyw165/.pi/agent/skills/my-pi-skills /Users/boyw165/Projects/my-pi-extension/.claude/skills/my-pi-skills)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm -rf ~/.claude/skills)",
+      "Bash(mkdir ~/.claude/skills)",
+      "Bash(for skill in forma-help-center forma-website-browsing stacked-git-workflow)",
+      "Bash(do ln -s ~/.pi/agent/skills/my-pi-skills/$skill ~/.claude/skills/$skill)",
+      "Bash(done)",
+      "Bash(for skill in brave-search browser-tools gccli gdcli gmcli transcribe vscode youtube-transcript)",
+      "Bash(do ln -s ~/.pi/agent/skills/pi-skills/$skill ~/.claude/skills/$skill)",
+      "Read(//Users/boyw165/.claude/skills/**)"
+    ]
+  },
+  "prefersReducedMotion": false
+}
